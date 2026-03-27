@@ -7,7 +7,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ArrowLeft, Upload, FileText, AlertTriangle } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 import StatusBadge from '@/components/shared/StatusBadge';
-import PageHeader from '@/components/shared/PageHeader';
 import { format } from 'date-fns';
 
 const formatINR = (v) => v ? `₹${Number(v).toLocaleString('en-IN')}` : '—';
@@ -73,10 +72,10 @@ export default function CollateralDetail() {
                 </Link>
             </div>
 
-            <PageHeader title={collateral.collateral_id || 'Collateral'} description={`${collateral.borrower_name} · ${collateral.type}`}>
+            <div className="mb-4 flex flex-wrap gap-2">
                 <StatusBadge status={collateral.status} />
                 <StatusBadge status={collateral.risk_level} />
-            </PageHeader>
+            </div>
 
             <Tabs defaultValue="overview" className="space-y-4">
                 <TabsList>

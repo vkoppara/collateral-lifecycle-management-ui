@@ -1,14 +1,13 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Plus, Building2 } from 'lucide-react';
-import PageHeader from '@/components/shared/PageHeader';
 import EmptyState from '@/components/shared/EmptyState';
 import { Badge } from '@/components/ui/badge';
 
@@ -30,7 +29,7 @@ export default function Branches() {
 
     return (
         <div>
-            <PageHeader title="Branch Management" description="Manage multi-branch hierarchy">
+            <div className="flex justify-end mb-4">
                 <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                     <DialogTrigger asChild>
                         <Button><Plus className="h-4 w-4 mr-2" />Add Branch</Button>
@@ -72,7 +71,7 @@ export default function Branches() {
                         </div>
                     </DialogContent>
                 </Dialog>
-            </PageHeader>
+            </div>
 
             {branches.length === 0 ? (
                 <EmptyState icon={Building2} title="No branches" description="Add your first branch" />

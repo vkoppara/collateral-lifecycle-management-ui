@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Filter } from 'lucide-react';
+import { Plus, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import PageHeader from '@/components/shared/PageHeader';
 import CollateralTable from '@/components/collaterals/CollateralTable';
 import CollateralForm from '@/components/collaterals/CollateralForm';
 
@@ -43,22 +42,6 @@ export default function Collaterals() {
 
     return (
         <div>
-            <PageHeader title="Collateral Registry" description="Manage all collateral assets">
-                <Button onClick={() => setShowForm(!showForm)}>
-                    <Plus className="h-4 w-4 mr-2" />New Collateral
-                </Button>
-            </PageHeader>
-
-            {showForm && (
-                <div className="mb-6">
-                    <CollateralForm
-                        borrowers={borrowers}
-                        onSubmit={(data) => createMutation.mutate(data)}
-                        onCancel={() => setShowForm(false)}
-                    />
-                </div>
-            )}
-
             <div className="flex flex-wrap gap-3 mb-4">
                 <div className="relative flex-1 min-w-[200px] max-w-sm">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -86,7 +69,20 @@ export default function Collaterals() {
                         <SelectItem value="npa">NPA</SelectItem>
                     </SelectContent>
                 </Select>
+                <Button className="sm:ml-auto" onClick={() => setShowForm(!showForm)}>
+                    <Plus className="h-4 w-4 mr-2" />New Collateral
+                </Button>
             </div>
+
+            {showForm && (
+                <div className="mb-6">
+                    <CollateralForm
+                        borrowers={borrowers}
+                        onSubmit={(data) => createMutation.mutate(data)}
+                        onCancel={() => setShowForm(false)}
+                    />
+                </div>
+            )}
 
             <CollateralTable collaterals={filtered} />
         </div>

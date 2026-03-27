@@ -2,9 +2,8 @@ import React from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid, PieChart, Pie, Cell, Legend, LineChart, Line } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid, PieChart, Pie, Cell, Legend } from 'recharts';
 import { BarChart3 } from 'lucide-react';
-import PageHeader from '@/components/shared/PageHeader';
 import StatCard from '@/components/shared/StatCard';
 
 const COLORS = ['hsl(222, 47%, 20%)', 'hsl(38, 92%, 50%)', 'hsl(160, 60%, 45%)', 'hsl(280, 65%, 60%)', 'hsl(340, 75%, 55%)'];
@@ -57,8 +56,6 @@ export default function Reports() {
 
     return (
         <div>
-            <PageHeader title="Reports & Analytics" description="Portfolio analysis & regulatory reporting" />
-
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
                 <StatCard title="Total Portfolio" value={formatINR(totalValue)} icon={BarChart3} />
                 <StatCard title="Total Exposure" value={formatINR(totalLoan)} />

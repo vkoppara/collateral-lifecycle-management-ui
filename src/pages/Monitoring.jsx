@@ -1,11 +1,10 @@
 import React from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Clock, FileWarning, ShieldAlert, RefreshCw } from 'lucide-react';
-import PageHeader from '@/components/shared/PageHeader';
 import StatCard from '@/components/shared/StatCard';
 import StatusBadge from '@/components/shared/StatusBadge';
 import EmptyState from '@/components/shared/EmptyState';
@@ -78,8 +77,6 @@ export default function Monitoring() {
 
     return (
         <div>
-            <PageHeader title="Monitoring & Revaluation" description="Track expirations, revaluations & NPA alerts" />
-
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
                 <StatCard title="Insurance Expiring" value={insuranceExpiring.length} subtitle="Within 60 days" icon={Clock} />
                 <StatCard title="Revaluation Due" value={revalDue.length} subtitle="Within 60 days" icon={FileWarning} />

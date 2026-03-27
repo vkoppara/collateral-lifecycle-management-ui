@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, FileText, Archive, Download, Eye } from 'lucide-react';
+import { Search, FileText, Archive, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import PageHeader from '@/components/shared/PageHeader';
 import EmptyState from '@/components/shared/EmptyState';
 import StatCard from '@/components/shared/StatCard';
 import { format } from 'date-fns';
@@ -39,8 +38,6 @@ export default function DocumentVault() {
 
     return (
         <div>
-            <PageHeader title="Document Vault" description="Digital document storage & retrieval" />
-
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
                 <StatCard title="Total Documents" value={allDocs.length} icon={FileText} />
                 <StatCard title="Collaterals with Docs" value={collaterals.filter(c => c.documents?.length > 0).length} icon={Archive} />

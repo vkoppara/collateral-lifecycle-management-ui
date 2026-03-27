@@ -29,16 +29,16 @@ export default function Sidebar() {
     return (
         <aside className={cn(
             "fixed left-0 top-0 h-screen bg-sidebar text-sidebar-foreground z-40 transition-all duration-300 flex flex-col",
-            collapsed ? "w-16" : "w-[17rem]"
+            collapsed ? "w-16" : "w-[19rem]"
         )}>
-            <div className="flex items-center gap-3 px-4 h-16 border-b border-sidebar-border shrink-0">
+            <div className="flex items-center gap-3 px-5 h-[4.5rem] border-b border-sidebar-border shrink-0">
                 <div className="h-8 w-8 rounded-lg bg-sidebar-primary flex items-center justify-center shrink-0">
                     <Shield className="h-4 w-4 text-sidebar-primary-foreground" />
                 </div>
                 {!collapsed && (
-                    <div className="overflow-hidden">
-                        <h1 className="text-sm font-bold tracking-tight truncate">Unified Collateral Intelligence</h1>
-                        <p className="text-[10px] text-sidebar-foreground/60 uppercase tracking-widest">UCIP</p>
+                    <div className="min-w-0 overflow-hidden flex-1">
+                        <h1 className="text-[1.02rem] font-bold tracking-tight whitespace-nowrap">Unified Collateral Intelligence</h1>
+                        <p className="text-xs text-sidebar-foreground/60 uppercase tracking-widest">UCIP</p>
                     </div>
                 )}
             </div>

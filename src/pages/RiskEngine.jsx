@@ -4,7 +4,6 @@ import { useQuery } from '@tanstack/react-query';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { AlertTriangle, ShieldAlert, TrendingUp, BarChart3 } from 'lucide-react';
-import PageHeader from '@/components/shared/PageHeader';
 import StatCard from '@/components/shared/StatCard';
 import StatusBadge from '@/components/shared/StatusBadge';
 import EmptyState from '@/components/shared/EmptyState';
@@ -36,8 +35,6 @@ export default function RiskEngine() {
 
     return (
         <div>
-            <PageHeader title="Risk Engine" description="LTV analysis, risk scoring & fraud detection" />
-
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
                 <StatCard title="Avg LTV Ratio" value={`${avgLTV}%`} icon={TrendingUp} />
                 <StatCard title="High LTV (>75%)" value={highLTV} subtitle="Require monitoring" icon={AlertTriangle} />

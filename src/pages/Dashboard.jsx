@@ -2,7 +2,6 @@ import React from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { Shield, IndianRupee, AlertTriangle, CheckCircle } from 'lucide-react';
-import PageHeader from '@/components/shared/PageHeader';
 import StatCard from '@/components/shared/StatCard';
 import PortfolioChart from '@/components/dashboard/PortfolioChart';
 import LTVDistribution from '@/components/dashboard/LTVDistribution';
@@ -36,8 +35,6 @@ export default function Dashboard() {
 
     return (
         <div>
-            <PageHeader title="Dashboard" description="Collateral portfolio overview & alerts" />
-
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
                 <StatCard title="Total Collaterals" value={collaterals.length} subtitle={`${activeCount} active`} icon={Shield} />
                 <StatCard title="Portfolio Value" value={formatINR(totalValue)} subtitle="Market value" icon={IndianRupee} />

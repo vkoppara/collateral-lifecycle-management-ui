@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,7 +10,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Plus, Search, Scale } from 'lucide-react';
-import PageHeader from '@/components/shared/PageHeader';
 import StatusBadge from '@/components/shared/StatusBadge';
 import EmptyState from '@/components/shared/EmptyState';
 import { format } from 'date-fns';
@@ -60,10 +59,14 @@ export default function Valuations() {
 
     return (
         <div>
-            <PageHeader title="Technical Valuations" description="Valuation management & market benchmarking">
+            <div className="flex flex-col gap-3 mb-4 sm:flex-row sm:items-center">
+                <div className="relative max-w-sm flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search valuations..." className="pl-9 h-9" />
+                </div>
                 <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                     <DialogTrigger asChild>
-                        <Button><Plus className="h-4 w-4 mr-2" />New Valuation</Button>
+                        <Button className="sm:ml-auto"><Plus className="h-4 w-4 mr-2" />New Valuation</Button>
                     </DialogTrigger>
                     <DialogContent className="max-w-lg">
                         <DialogHeader><DialogTitle>Assign Valuation</DialogTitle></DialogHeader>
@@ -113,13 +116,6 @@ export default function Valuations() {
                         </div>
                     </DialogContent>
                 </Dialog>
-            </PageHeader>
-
-            <div className="mb-4">
-                <div className="relative max-w-sm">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search valuations..." className="pl-9 h-9" />
-                </div>
             </div>
 
             {filtered.length === 0 ? (
