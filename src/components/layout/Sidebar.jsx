@@ -29,7 +29,7 @@ export default function Sidebar() {
     return (
         <aside className={cn(
             "fixed left-0 top-0 h-screen bg-sidebar text-sidebar-foreground z-40 transition-all duration-300 flex flex-col",
-            collapsed ? "w-16" : "w-60"
+            collapsed ? "w-16" : "w-[17rem]"
         )}>
             <div className="flex items-center gap-3 px-4 h-16 border-b border-sidebar-border shrink-0">
                 <div className="h-8 w-8 rounded-lg bg-sidebar-primary flex items-center justify-center shrink-0">
@@ -37,8 +37,8 @@ export default function Sidebar() {
                 </div>
                 {!collapsed && (
                     <div className="overflow-hidden">
-                        <h1 className="text-sm font-bold tracking-tight truncate">CollateralOS</h1>
-                        <p className="text-[10px] text-sidebar-foreground/60 uppercase tracking-widest">NBFC Suite</p>
+                        <h1 className="text-sm font-bold tracking-tight truncate">Unified Collateral Intelligence</h1>
+                        <p className="text-[10px] text-sidebar-foreground/60 uppercase tracking-widest">UCIP</p>
                     </div>
                 )}
             </div>
@@ -65,17 +65,26 @@ export default function Sidebar() {
                 })}
             </nav>
 
-            <div className="p-2 border-t border-sidebar-border space-y-1">
+            <div className={cn(
+                "p-2 border-t border-sidebar-border",
+                collapsed ? "space-y-1" : "flex items-center gap-1"
+            )}>
                 <button
                     onClick={() => base44.auth.logout()}
-                    className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 w-full transition-colors"
+                    className={cn(
+                        "flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors",
+                        collapsed ? "w-full" : "flex-1"
+                    )}
                 >
                     <LogOut className="h-4 w-4 shrink-0" />
                     {!collapsed && <span>Sign Out</span>}
                 </button>
                 <button
                     onClick={() => setCollapsed(!collapsed)}
-                    className="flex items-center justify-center w-full py-1.5 rounded-lg text-sidebar-foreground/40 hover:text-sidebar-foreground/70 transition-colors"
+                    className={cn(
+                        "flex items-center justify-center rounded-lg text-sidebar-foreground/40 hover:text-sidebar-foreground/70 transition-colors",
+                        collapsed ? "w-full py-1.5" : "w-9 h-9 shrink-0"
+                    )}
                 >
                     {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
                 </button>

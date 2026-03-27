@@ -1,9 +1,8 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ArrowLeft, Upload, FileText, AlertTriangle } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
@@ -49,9 +48,17 @@ export default function CollateralDetail() {
     const handleFileUpload = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
-        const { file_url } = await base44.integrations.Core.UploadFile({ file });
-        const docs = [...(collateral.documents || []), { name: file.name, url: file_url, type: file.type, uploaded_date: new Date().toISOString() }];
-        updateMutation.mutate({ documents: docs });
+
+        try {
+            const { file_url } = await base44.integrations.Core.UploadFile({ file });
+            const docs = [...(collateral.documents || []), { name: file.name, url: file_url, type: file.type, uploaded_date: new Date().toISOString() }];
+            updateMutation.mutate({ documents: docs });
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Failed to upload file.';
+            window.alert(message);
+        } finally {
+            e.target.value = '';
+        }
     };
 
     if (isLoading || !collateral) {

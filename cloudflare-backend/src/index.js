@@ -392,11 +392,18 @@ const handleRequest = async (request, env) => {
 
     const id = `${Date.now()}-${crypto.randomUUID()}`;
     const createdDate = nowIso();
-    await env.DB.prepare(
-      'INSERT INTO uploaded_files (id, name, mime_type, data_base64, created_date) VALUES (?, ?, ?, ?, ?)'
-    )
-      .bind(id, String(body.name || 'upload.bin'), String(body.type || 'application/octet-stream'), content, createdDate)
-      .run();
+    try {
+      await env.DB.prepare(
+        'INSERT INTO uploaded_files (id, name, mime_type, data_base64, created_date) VALUES (?, ?, ?, ?, ?)'
+      )
+        .bind(id, String(body.name || 'upload.bin'), String(body.type || 'application/octet-stream'), content, createdDate)
+        .run();
+    } catch (error) {
+      if (String(error?.message || '').includes('SQLITE_TOOBIG')) {
+        return json({ error: 'File is too large. Maximum supported size is 700 KB.' }, 413);
+      }
+      throw error;
+    }
 
     return json({ file_url: `${url.origin}/api/uploads/${id}` });
   }

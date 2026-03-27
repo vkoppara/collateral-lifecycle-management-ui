@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
-import { Menu, X } from 'lucide-react';
+import { Menu } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function AppLayout() {
@@ -25,13 +25,13 @@ export default function AppLayout() {
             )}
 
             {/* Main content */}
-            <main className={cn("lg:ml-60 min-h-screen transition-all duration-300")}>
+            <main className={cn("lg:ml-[17rem] min-h-screen transition-all duration-300")}>
                 {/* Mobile header */}
                 <div className="lg:hidden flex items-center gap-3 p-4 border-b bg-card">
                     <button onClick={() => setMobileOpen(true)}>
                         <Menu className="h-5 w-5" />
                     </button>
-                    <h1 className="font-bold text-sm">CollateralOS</h1>
+                    <h1 className="font-bold text-sm">Unified Collateral Intelligence (UCIP)</h1>
                 </div>
 
                 <div className="p-4 md:p-6 lg:p-8">

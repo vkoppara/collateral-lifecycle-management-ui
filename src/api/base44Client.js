@@ -1,4 +1,5 @@
 const API_BASE = 'https://collateral-backend.gangaa.workers.dev/api';
+const MAX_UPLOAD_BYTES = 700 * 1024;
 
 const request = async (path, options = {}) => {
     const response = await fetch(`${API_BASE}${path}`, {
@@ -51,6 +52,10 @@ export const base44 = {
     integrations: {
         Core: {
             UploadFile: async ({ file }) => {
+                if (file.size > MAX_UPLOAD_BYTES) {
+                    throw new Error('File is too large. Maximum supported size is 700 KB.');
+                }
+
                 const contentBase64 = await toDataUrl(file);
                 return request('/integrations/core/upload-file', {
                     method: 'POST',
