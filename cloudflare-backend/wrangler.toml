@@ -1,0 +1,8 @@
+name = "collateral-backend"
+main = "src/index.js"
+compatibility_date = "2026-03-27"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "collateral-db"
+database_id = "919a1ecc-dbab-4b40-ac9f-8d22819a5888"

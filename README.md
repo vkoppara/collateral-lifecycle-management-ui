@@ -28,6 +28,43 @@ VITE_BASE44_APP_BASE_URL=https://my-to-do-list-81bfaad7.base44.app
 
 Run the app: `npm run dev`
 
+For local frontend + local Node backend:
+
+1. Start backend: `npm run backend`
+2. In another terminal start frontend: `npm run dev`
+
+## Cloudflare backend deployment
+
+This repo includes a Cloudflare Worker backend at `cloudflare-backend/src/index.js` using D1 for persistence.
+
+1. Install Wrangler (if needed): `npm i -D wrangler`
+2. Create a D1 database:
+
+```bash
+npx wrangler d1 create collateral-db
+```
+
+3. Copy the returned `database_id` into `cloudflare-backend/wrangler.toml`
+4. Apply migrations:
+
+```bash
+npx wrangler d1 migrations apply collateral-db --config cloudflare-backend/wrangler.toml
+```
+
+5. Deploy the worker:
+
+```bash
+npx wrangler deploy --config cloudflare-backend/wrangler.toml
+```
+
+6. Point frontend to this API by setting `VITE_API_BASE_URL` (for example in `.env.production`):
+
+```bash
+VITE_API_BASE_URL=https://<your-worker-subdomain>/api
+```
+
+If you use Cloudflare Pages + Functions routes on the same domain, you can also leave `VITE_API_BASE_URL` unset and the frontend will use `/api` in production.
+
 **Publish your changes**
 
 Open [Base44.com](http://Base44.com) and click on Publish.

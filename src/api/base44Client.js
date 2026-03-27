@@ -1,4 +1,4 @@
-const API_BASE = 'http://localhost:3000/api';
+const API_BASE = 'https://collateral-backend.gangaa.workers.dev/api';
 
 const request = async (path, options = {}) => {
     const response = await fetch(`${API_BASE}${path}`, {
