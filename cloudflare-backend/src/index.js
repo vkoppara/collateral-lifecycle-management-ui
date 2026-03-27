@@ -15,7 +15,7 @@ const responseHeaders = (contentType = 'application/json') => ({
   'Content-Type': contentType,
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 });
 
 const json = (payload, status = 200) =>
@@ -55,6 +55,101 @@ const initDb = async (db) => {
       'CREATE TABLE IF NOT EXISTS uploaded_files (id TEXT PRIMARY KEY, name TEXT NOT NULL, mime_type TEXT, data_base64 TEXT NOT NULL, created_date TEXT NOT NULL)'
     )
     .run();
+
+  await db
+    .prepare(
+      'CREATE TABLE IF NOT EXISTS auth_sessions (token TEXT PRIMARY KEY, user_data TEXT NOT NULL, created_date TEXT NOT NULL)'
+    )
+    .run();
+
+  await db
+    .prepare(
+      'CREATE TABLE IF NOT EXISTS auth_credentials (email TEXT PRIMARY KEY, password_hash TEXT NOT NULL, updated_date TEXT NOT NULL)'
+    )
+    .run();
+};
+
+const hashPassword = async (password, secret = '') => {
+  const input = `${password}::${secret}`;
+  const bytes = new TextEncoder().encode(input);
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return [...new Uint8Array(digest)].map((part) => part.toString(16).padStart(2, '0')).join('');
+};
+
+const getBearerToken = (request) => {
+  const authHeader = request.headers.get('Authorization') || '';
+  const match = authHeader.match(/^Bearer\s+(.+)$/i);
+  return match ? match[1].trim() : null;
+};
+
+const getSessionUser = async (db, request) => {
+  const token = getBearerToken(request);
+  if (!token) return null;
+
+  const row = await db
+    .prepare('SELECT user_data FROM auth_sessions WHERE token = ?')
+    .bind(token)
+    .first();
+
+  if (!row?.user_data) return null;
+
+  try {
+    return JSON.parse(row.user_data);
+  } catch {
+    return null;
+  }
+};
+
+const verifyGoogleCredential = async (credential) => {
+  const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`);
+  if (!response.ok) {
+    return null;
+  }
+
+  const payload = await response.json();
+  if (!payload?.email || payload?.email_verified !== 'true') {
+    return null;
+  }
+
+  return {
+    email: payload.email,
+    full_name: payload.name || payload.given_name || payload.email,
+    picture: payload.picture || null,
+  };
+};
+
+const upsertCredentialByEmail = async (db, email, passwordHash) => {
+  const stamp = nowIso();
+  await db
+    .prepare('INSERT OR REPLACE INTO auth_credentials (email, password_hash, updated_date) VALUES (?, ?, ?)')
+    .bind(email.toLowerCase(), passwordHash, stamp)
+    .run();
+};
+
+const findUserByEmail = async (db, email) => {
+  const users = await listEntities(db, 'User', '-created_date', 500);
+  return users.find((user) => user.email?.toLowerCase() === String(email).toLowerCase()) || null;
+};
+
+const upsertUserByEmail = async (db, profile) => {
+  const users = await listEntities(db, 'User', '-created_date', 500);
+  const existing = users.find((user) => user.email?.toLowerCase() === profile.email.toLowerCase());
+
+  if (existing) {
+    const patch = {
+      full_name: profile.full_name,
+      picture_url: profile.picture,
+    };
+    const updated = await updateEntityRecord(db, 'User', existing.id, patch);
+    return updated || { ...existing, ...patch };
+  }
+
+  return createEntityRecord(db, 'User', {
+    full_name: profile.full_name,
+    email: profile.email,
+    role: 'user',
+    picture_url: profile.picture,
+  });
 };
 
 const addAuditLog = async (db, { action, entityType, entityId, details }) => {
@@ -217,6 +312,10 @@ const seedData = async (db) => {
     created
   );
 
+  const defaultPassword = 'Admin@123';
+  const defaultHash = await hashPassword(defaultPassword, 'ucip-local');
+  await upsertCredentialByEmail(db, 'admin@collateral.local', defaultHash);
+
   await upsertSeed(
     db,
     'Branch',
@@ -369,17 +468,80 @@ const handleRequest = async (request, env) => {
     return json({ ok: true });
   }
 
+  if (request.method === 'POST' && pathname === '/api/auth/google') {
+    const body = await safeJsonParse(request);
+    const credential = String(body.credential || '');
+
+    if (!credential) {
+      return json({ error: 'Missing Google credential' }, 400);
+    }
+
+    const googleUser = await verifyGoogleCredential(credential);
+    if (!googleUser) {
+      return json({ error: 'Invalid Google credential' }, 401);
+    }
+
+    const user = await upsertUserByEmail(env.DB, googleUser);
+    const token = `${crypto.randomUUID()}${crypto.randomUUID().replace(/-/g, '')}`;
+    const createdDate = nowIso();
+
+    await env.DB
+      .prepare('INSERT INTO auth_sessions (token, user_data, created_date) VALUES (?, ?, ?)')
+      .bind(token, JSON.stringify(user), createdDate)
+      .run();
+
+    return json({ token, user });
+  }
+
+  if (request.method === 'POST' && pathname === '/api/auth/login') {
+    const body = await safeJsonParse(request);
+    const email = String(body.email || '').trim().toLowerCase();
+    const password = String(body.password || '');
+
+    if (!email || !password) {
+      return json({ error: 'Email and password are required' }, 400);
+    }
+
+    const cred = await env.DB
+      .prepare('SELECT password_hash FROM auth_credentials WHERE email = ?')
+      .bind(email)
+      .first();
+
+    if (!cred?.password_hash) {
+      return json({ error: 'Invalid email or password' }, 401);
+    }
+
+    const inputHash = await hashPassword(password, 'ucip-local');
+    if (inputHash !== cred.password_hash) {
+      return json({ error: 'Invalid email or password' }, 401);
+    }
+
+    const user = await findUserByEmail(env.DB, email);
+    if (!user) {
+      return json({ error: 'User not found' }, 404);
+    }
+
+    const token = `${crypto.randomUUID()}${crypto.randomUUID().replace(/-/g, '')}`;
+    await env.DB
+      .prepare('INSERT INTO auth_sessions (token, user_data, created_date) VALUES (?, ?, ?)')
+      .bind(token, JSON.stringify(user), nowIso())
+      .run();
+
+    return json({ token, user });
+  }
+
   if (request.method === 'GET' && pathname === '/api/auth/me') {
-    const users = await listEntities(env.DB, 'User', '-created_date', 1);
-    const user =
-      users[0] ||
-      {
-        id: 'cloudflare-user',
-        full_name: 'Cloudflare User',
-        email: 'user@collateral.local',
-        role: 'admin',
-      };
+    const user = await getSessionUser(env.DB, request);
+    if (!user) {
+      return json({ error: 'Unauthorized' }, 401);
+    }
+
     return json(user);
+  }
+
+  const currentUser = await getSessionUser(env.DB, request);
+  if (!currentUser && (pathname.startsWith('/api/entities/') || pathname.startsWith('/api/integrations/core/upload-file'))) {
+    return json({ error: 'Unauthorized' }, 401);
   }
 
   if (request.method === 'POST' && pathname === '/api/integrations/core/upload-file') {

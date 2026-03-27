@@ -5,8 +5,8 @@ import {
     CheckSquare, Archive, BarChart3, Users, Building2,
     ChevronLeft, ChevronRight, LogOut, RefreshCw
 } from 'lucide-react';
-import { base44 } from '@/api/base44Client';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/lib/AuthContext';
 
 const navItems = [
     { path: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -25,6 +25,7 @@ const navItems = [
 export default function Sidebar() {
     const [collapsed, setCollapsed] = useState(false);
     const location = useLocation();
+    const { logout } = useAuth();
 
     return (
         <aside className={cn(
@@ -70,7 +71,7 @@ export default function Sidebar() {
                 collapsed ? "space-y-1" : "flex items-center gap-1"
             )}>
                 <button
-                    onClick={() => base44.auth.logout()}
+                    onClick={() => logout(true)}
                     className={cn(
                         "flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors",
                         collapsed ? "w-full" : "flex-1"

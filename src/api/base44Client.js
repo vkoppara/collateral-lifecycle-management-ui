@@ -1,10 +1,25 @@
 const API_BASE = 'https://collateral-backend.gangaa.workers.dev/api';
 const MAX_UPLOAD_BYTES = 700 * 1024;
+const AUTH_TOKEN_KEY = 'token';
+
+const getAuthToken = () => {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem(AUTH_TOKEN_KEY);
+};
+
+const buildAppPath = (path = '') => {
+    const base = import.meta.env.BASE_URL || '/';
+    const normalizedBase = base.endsWith('/') ? base : `${base}/`;
+    const normalizedPath = path.startsWith('/') ? path.slice(1) : path;
+    return `${normalizedBase}${normalizedPath}`;
+};
 
 const request = async (path, options = {}) => {
+    const token = getAuthToken();
     const response = await fetch(`${API_BASE}${path}`, {
         headers: {
             'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
             ...(options.headers || {}),
         },
         ...options,
@@ -69,20 +84,31 @@ export const base44 = {
         },
     },
     auth: {
+        loginWithGoogle: async (credential) => request('/auth/google', {
+            method: 'POST',
+            body: JSON.stringify({ credential }),
+        }),
+        loginWithPassword: async ({ email, password }) => request('/auth/login', {
+            method: 'POST',
+            body: JSON.stringify({ email, password }),
+        }),
         me: async () => request('/auth/me', { method: 'GET' }),
         logout: (redirectUrl) => {
             if (typeof window !== 'undefined') {
                 localStorage.removeItem('base44_access_token');
                 localStorage.removeItem('token');
-                if (redirectUrl) {
-                    window.location.href = redirectUrl;
-                }
+                window.location.href = redirectUrl || buildAppPath('/login');
             }
         },
-        redirectToLogin: (redirectUrl) => {
-            if (typeof window !== 'undefined' && redirectUrl) {
-                window.location.href = redirectUrl;
+        redirectToLogin: () => {
+            if (typeof window !== 'undefined') {
+                window.location.href = buildAppPath('/login');
             }
         },
+        setToken: (token) => {
+            if (typeof window === 'undefined') return;
+            localStorage.setItem(AUTH_TOKEN_KEY, token);
+        },
+        getToken: getAuthToken,
     },
 };

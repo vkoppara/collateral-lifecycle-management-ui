@@ -28,6 +28,31 @@ VITE_BASE44_APP_BASE_URL=https://my-to-do-list-81bfaad7.base44.app
 
 Run the app: `npm run dev`
 
+## Google OAuth login setup
+
+The app now uses a dedicated login page and requires Google sign-in before accessing dashboard routes.
+
+1. Create an OAuth Client ID in Google Cloud Console (type: **Web application**)
+2. Add your frontend origins (for example `http://localhost:5173` and your production domain)
+3. Set the client ID in your frontend environment file:
+
+```bash
+VITE_GOOGLE_CLIENT_ID=your_google_web_client_id
+```
+
+4. Restart the frontend dev server after updating env vars
+
+The backend validates the Google ID token server-side before issuing an app session token.
+
+## Email + password login (default local account)
+
+For local/demo environments, a default account is seeded:
+
+- Email: `admin@collateral.local`
+- Password: `Admin@123`
+
+You can sign in either with this account or with Google OAuth.
+
 For local frontend + local Node backend:
 
 1. Start backend: `npm run backend`
