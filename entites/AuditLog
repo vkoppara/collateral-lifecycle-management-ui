@@ -1,0 +1,40 @@
+{
+    "name": "AuditLog",
+    "type": "object",
+    "properties": {
+        "action": {
+            "type": "string",
+            "description": "Action performed"
+        },
+        "entity_type": {
+            "type": "string",
+            "description": "Which entity was affected"
+        },
+        "entity_id": {
+            "type": "string"
+        },
+        "user_email": {
+            "type": "string"
+        },
+        "user_name": {
+            "type": "string"
+        },
+        "details": {
+            "type": "string"
+        },
+        "ip_address": {
+            "type": "string"
+        },
+        "branch": {
+            "type": "string"
+        },
+        "changes": {
+            "type": "object",
+            "description": "Before/after snapshot"
+        }
+    },
+    "required": [
+        "action",
+        "entity_type"
+    ]
+}

@@ -1,0 +1,81 @@
+{
+  "name": "Borrower",
+  "type": "object",
+  "properties": {
+    "full_name": {
+      "type": "string",
+      "description": "Full legal name"
+    },
+    "pan_number": {
+      "type": "string",
+      "description": "PAN card number"
+    },
+    "aadhaar_number": {
+      "type": "string",
+      "description": "Aadhaar number (masked)"
+    },
+    "phone": {
+      "type": "string"
+    },
+    "email": {
+      "type": "string"
+    },
+    "address": {
+      "type": "string"
+    },
+    "city": {
+      "type": "string"
+    },
+    "state": {
+      "type": "string"
+    },
+    "pincode": {
+      "type": "string"
+    },
+    "borrower_type": {
+      "type": "string",
+      "enum": [
+        "individual",
+        "company",
+        "partnership",
+        "huf"
+      ],
+      "default": "individual"
+    },
+    "kyc_status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "verified",
+        "rejected"
+      ],
+      "default": "pending"
+    },
+    "cibil_score": {
+      "type": "number"
+    },
+    "branch": {
+      "type": "string"
+    },
+    "documents": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "full_name"
+  ]
+}

@@ -1,0 +1,74 @@
+{
+    "name": "ApprovalRequest",
+    "type": "object",
+    "properties": {
+        "collateral_id": {
+            "type": "string"
+        },
+        "collateral_ref": {
+            "type": "string"
+        },
+        "request_type": {
+            "type": "string",
+            "enum": [
+                "onboarding",
+                "valuation",
+                "legal_clearance",
+                "final_approval",
+                "release",
+                "revaluation"
+            ],
+            "default": "onboarding"
+        },
+        "requested_by": {
+            "type": "string"
+        },
+        "assigned_to": {
+            "type": "string"
+        },
+        "level": {
+            "type": "number",
+            "description": "Approval level (1, 2, 3)"
+        },
+        "status": {
+            "type": "string",
+            "enum": [
+                "pending",
+                "approved",
+                "rejected",
+                "escalated"
+            ],
+            "default": "pending"
+        },
+        "remarks": {
+            "type": "string"
+        },
+        "decided_by": {
+            "type": "string"
+        },
+        "decided_date": {
+            "type": "string",
+            "format": "date"
+        },
+        "loan_amount": {
+            "type": "number"
+        },
+        "ltv_ratio": {
+            "type": "number"
+        },
+        "priority": {
+            "type": "string",
+            "enum": [
+                "low",
+                "medium",
+                "high",
+                "urgent"
+            ],
+            "default": "medium"
+        }
+    },
+    "required": [
+        "collateral_id",
+        "request_type"
+    ]
+}

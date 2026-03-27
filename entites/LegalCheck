@@ -1,0 +1,103 @@
+{
+    "name": "LegalCheck",
+    "type": "object",
+    "properties": {
+        "collateral_id": {
+            "type": "string"
+        },
+        "collateral_ref": {
+            "type": "string"
+        },
+        "officer_name": {
+            "type": "string"
+        },
+        "officer_email": {
+            "type": "string"
+        },
+        "title_status": {
+            "type": "string",
+            "enum": [
+                "pending",
+                "clear",
+                "defective",
+                "disputed"
+            ],
+            "default": "pending"
+        },
+        "encumbrance_status": {
+            "type": "string",
+            "enum": [
+                "pending",
+                "clear",
+                "encumbered"
+            ],
+            "default": "pending"
+        },
+        "cersai_check": {
+            "type": "string",
+            "enum": [
+                "pending",
+                "clear",
+                "registered_elsewhere"
+            ],
+            "default": "pending"
+        },
+        "checklist": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "item": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "remarks": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "risk_flags": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        },
+        "overall_status": {
+            "type": "string",
+            "enum": [
+                "pending",
+                "approved",
+                "rejected",
+                "conditional"
+            ],
+            "default": "pending"
+        },
+        "remarks": {
+            "type": "string"
+        },
+        "verification_date": {
+            "type": "string",
+            "format": "date"
+        },
+        "documents": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string"
+                    },
+                    "url": {
+                        "type": "string"
+                    }
+                }
+            }
+        }
+    },
+    "required": [
+        "collateral_id"
+    ]
+}

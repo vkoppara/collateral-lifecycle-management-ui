@@ -1,0 +1,85 @@
+{
+    "name": "Valuation",
+    "type": "object",
+    "properties": {
+        "collateral_id": {
+            "type": "string"
+        },
+        "collateral_ref": {
+            "type": "string",
+            "description": "Collateral reference ID"
+        },
+        "valuer_name": {
+            "type": "string"
+        },
+        "valuer_email": {
+            "type": "string"
+        },
+        "valuation_type": {
+            "type": "string",
+            "enum": [
+                "initial",
+                "revaluation",
+                "avm",
+                "market_comparison"
+            ],
+            "default": "initial"
+        },
+        "market_value": {
+            "type": "number"
+        },
+        "distress_value": {
+            "type": "number"
+        },
+        "replacement_value": {
+            "type": "number"
+        },
+        "valuation_date": {
+            "type": "string",
+            "format": "date"
+        },
+        "report_url": {
+            "type": "string"
+        },
+        "status": {
+            "type": "string",
+            "enum": [
+                "pending",
+                "in_progress",
+                "completed",
+                "disputed"
+            ],
+            "default": "pending"
+        },
+        "remarks": {
+            "type": "string"
+        },
+        "benchmark_data": {
+            "type": "object",
+            "properties": {
+                "avg_area_rate": {
+                    "type": "number"
+                },
+                "comparable_sales": {
+                    "type": "number"
+                },
+                "variance_pct": {
+                    "type": "number"
+                }
+            }
+        },
+        "geo_tagged": {
+            "type": "boolean",
+            "default": false
+        },
+        "photos": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        }
+    },
+    "required": [
+        "collateral_id"
+    ]
+}

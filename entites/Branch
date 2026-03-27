@@ -1,0 +1,32 @@
+{
+    "name": "Branch",
+    "type": "object",
+    "properties": {
+        "name": {
+            "type": "string"
+        },
+        "code": {
+            "type": "string"
+        },
+        "city": {
+            "type": "string"
+        },
+        "state": {
+            "type": "string"
+        },
+        "region": {
+            "type": "string"
+        },
+        "manager_email": {
+            "type": "string"
+        },
+        "active": {
+            "type": "boolean",
+            "default": true
+        }
+    },
+    "required": [
+        "name",
+        "code"
+    ]
+}
