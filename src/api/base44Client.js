@@ -92,6 +92,10 @@ export const base44 = {
             method: 'POST',
             body: JSON.stringify({ email, password }),
         }),
+        registerWithPassword: async ({ full_name, email, password }) => request('/auth/register', {
+            method: 'POST',
+            body: JSON.stringify({ full_name, email, password }),
+        }),
         me: async () => request('/auth/me', { method: 'GET' }),
         logout: (redirectUrl) => {
             if (typeof window !== 'undefined') {

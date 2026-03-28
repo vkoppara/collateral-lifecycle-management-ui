@@ -5,7 +5,9 @@ import { Bell, Menu, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { useAuth } from '@/lib/AuthContext';
 
 const notifications = [
     {
@@ -46,13 +48,25 @@ const pageHeaderMeta = [
 export default function AppLayout() {
     const [mobileOpen, setMobileOpen] = useState(false);
     const location = useLocation();
+    const { user } = useAuth();
+
+    const displayName = user?.full_name || user?.name || 'Authenticated User';
+    const email = user?.email || 'No email available';
+    const role = (user?.role || 'user').replace(/_/g, ' ');
+    const initials = displayName
+        .split(' ')
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part[0]?.toUpperCase())
+        .join('') || 'U';
+
     const pageMeta = pageHeaderMeta.find((item) => item.matcher.test(location.pathname)) || {
         title: 'Unified Collateral Intelligence',
         subtitle: 'Manage and monitor collateral operations',
     };
 
     return (
-        <div className="min-h-screen bg-background">
+        <div className="min-h-screen bg-transparent">
             {/* Desktop sidebar */}
             <div className="hidden lg:block">
                 <Sidebar />
@@ -61,7 +75,7 @@ export default function AppLayout() {
             {/* Mobile sidebar overlay */}
             {mobileOpen && (
                 <div className="lg:hidden fixed inset-0 z-50">
-                    <div className="absolute inset-0 bg-black/50" onClick={() => setMobileOpen(false)} />
+                    <div className="absolute inset-0 bg-slate-900/35 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
                     <div className="relative z-10">
                         <Sidebar />
                     </div>
@@ -69,12 +83,12 @@ export default function AppLayout() {
             )}
 
             {/* Main content */}
-            <main className={cn("lg:ml-[19rem] min-h-screen transition-all duration-300")}>
-                <header className="sticky top-0 z-30 border-b bg-card/95 backdrop-blur">
+            <main className={cn("lg:ml-[19.5rem] min-h-screen transition-all duration-300")}>
+                <header className="sticky top-0 z-30 glass-panel border-x-0 border-t-0 rounded-none">
                     <div className="flex h-[4.5rem] items-center gap-3 px-5 md:px-8 lg:px-10">
                         <button
                             onClick={() => setMobileOpen(true)}
-                            className="lg:hidden inline-flex items-center justify-center h-9 w-9 rounded-md border border-input hover:bg-accent"
+                            className="lg:hidden inline-flex items-center justify-center h-9 w-9 rounded-xl border border-white/50 bg-white/35 backdrop-blur-xl hover:bg-white/55"
                         >
                             <Menu className="h-5 w-5" />
                         </button>
@@ -87,12 +101,12 @@ export default function AppLayout() {
                         <div className="ml-auto flex items-center gap-2 md:gap-3">
                             <div className="relative w-48 sm:w-64 md:w-80">
                                 <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                                <Input type="search" placeholder="Search..." className="h-9 pl-8" />
+                                <Input type="search" placeholder="Search..." className="h-9 pl-8 bg-white/34" />
                             </div>
 
                             <Popover>
                                 <PopoverTrigger asChild>
-                                    <Button variant="outline" size="icon" className="relative">
+                                    <Button variant="outline" size="icon" className="relative border-white/45 bg-white/34">
                                         <Bell className="h-4 w-4" />
                                         <span className="absolute -top-1 -right-1 h-4 min-w-4 rounded-full bg-red-500 px-1 text-[10px] leading-4 text-white">
                                             {notifications.length}
@@ -115,6 +129,28 @@ export default function AppLayout() {
                                     </div>
                                 </PopoverContent>
                             </Popover>
+
+                            <div className="glass-panel hidden h-10 items-center gap-2 rounded-full px-2.5 md:flex">
+                                <Avatar className="h-7 w-7 border border-white/60">
+                                    <AvatarImage src={user?.picture_url || ''} alt={displayName} />
+                                    <AvatarFallback className="bg-sky-100 text-[11px] font-semibold text-sky-700">
+                                        {initials}
+                                    </AvatarFallback>
+                                </Avatar>
+                                <div className="min-w-0 max-w-[14rem]">
+                                    <p className="truncate text-xs font-semibold text-foreground">{displayName}</p>
+                                    <p className="truncate text-[11px] text-muted-foreground">{email} - {role}</p>
+                                </div>
+                            </div>
+
+                            <div className="glass-panel flex h-9 w-9 items-center justify-center rounded-full md:hidden">
+                                <Avatar className="h-7 w-7 border border-white/60">
+                                    <AvatarImage src={user?.picture_url || ''} alt={displayName} />
+                                    <AvatarFallback className="bg-sky-100 text-[11px] font-semibold text-sky-700">
+                                        {initials}
+                                    </AvatarFallback>
+                                </Avatar>
+                            </div>
                         </div>
                     </div>
                 </header>

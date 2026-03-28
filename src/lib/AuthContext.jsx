@@ -65,6 +65,24 @@ export const AuthProvider = ({ children }) => {
         return response.user;
     };
 
+    const registerWithPassword = async ({ fullName, email, password }) => {
+        const response = await base44.auth.registerWithPassword({
+            full_name: fullName,
+            email,
+            password,
+        });
+
+        if (!response?.token || !response?.user) {
+            throw new Error('Invalid registration response from server');
+        }
+
+        base44.auth.setToken(response.token);
+        setUser(response.user);
+        setIsAuthenticated(true);
+        setAuthError(null);
+        return response.user;
+    };
+
     const logout = (shouldRedirect = true) => {
         setUser(null);
         setIsAuthenticated(false);
@@ -92,6 +110,7 @@ export const AuthProvider = ({ children }) => {
             logout,
             loginWithGoogle,
             loginWithPassword,
+            registerWithPassword,
             navigateToLogin,
             checkUserAuth,
         }}>

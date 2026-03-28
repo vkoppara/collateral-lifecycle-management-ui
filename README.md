@@ -62,33 +62,86 @@ For local frontend + local Node backend:
 
 This repo includes a Cloudflare Worker backend at `cloudflare-backend/src/index.js` using D1 for persistence.
 
-1. Install Wrangler (if needed): `npm i -D wrangler`
-2. Create a D1 database:
+1. Install dependencies: `npm install`
+2. Install Wrangler (if needed): `npm i -D wrangler`
+3. Create a D1 database:
 
 ```bash
 npx wrangler d1 create collateral-db
 ```
 
-3. Copy the returned `database_id` into `cloudflare-backend/wrangler.toml`
-4. Apply migrations:
+4. Copy the returned `database_id` into `cloudflare-backend/wrangler.toml`
+5. Apply migrations:
 
 ```bash
 npx wrangler d1 migrations apply collateral-db --config cloudflare-backend/wrangler.toml
 ```
 
-5. Deploy the worker:
+6. Run backend locally (Cloudflare dev):
 
 ```bash
-npx wrangler deploy --config cloudflare-backend/wrangler.toml
+npm run backend:cf:dev
 ```
 
-6. Point frontend to this API by setting `VITE_API_BASE_URL` (for example in `.env.production`):
+7. Deploy the worker:
+
+```bash
+npm run backend:cf:deploy
+```
+
+8. Point frontend to this API by setting `VITE_API_BASE_URL` (for example in `.env.production`):
 
 ```bash
 VITE_API_BASE_URL=https://<your-worker-subdomain>/api
 ```
 
 If you use Cloudflare Pages + Functions routes on the same domain, you can also leave `VITE_API_BASE_URL` unset and the frontend will use `/api` in production.
+
+## Swagger / OpenAPI
+
+The Cloudflare backend now uses Hono + zod-openapi, so API docs are generated from route schemas.
+
+- OpenAPI JSON: `/api/openapi.json`
+- Swagger UI: `/api/docs` (also available at `/swagger`)
+
+Example:
+
+```bash
+https://collateral-backend.gangaa.workers.dev/api/docs
+```
+
+## Adding a new entity
+
+Entity docs and typed Swagger endpoints are generated from files in the `entites/` folder.
+
+1. Add a new JSON schema file at `entites/<EntityName>`
+   - Include `name`, `type`, `properties`, and optional `required`
+2. Regenerate backend entity schema registry:
+
+```bash
+npm run generate:entity-schemas
+```
+
+3. Start local CF backend and verify Swagger:
+
+```bash
+npm run backend:cf:dev
+```
+
+4. Check docs for new endpoints:
+   - `GET /api/entities/<EntityName>`
+   - `POST /api/entities/<EntityName>`
+   - `PUT /api/entities/<EntityName>/{id}`
+   - `PATCH /api/entities/<EntityName>/{id}`
+5. Deploy backend:
+
+```bash
+npm run backend:cf:deploy
+```
+
+Notes:
+- `backend:cf:dev` and `backend:cf:deploy` automatically run `generate:entity-schemas` first.
+- If your entity schema file is invalid JSON, schema generation fails fast so docs/routes do not drift.
 
 **Publish your changes**
 

@@ -1,0 +1,39 @@
+{
+  "name": "User",
+  "type": "object",
+  "properties": {
+    "full_name": {
+      "type": "string",
+      "description": "User full name"
+    },
+    "email": {
+      "type": "string",
+      "format": "email",
+      "description": "User email address"
+    },
+    "role": {
+      "type": "string",
+      "enum": [
+        "admin",
+        "checker",
+        "valuer",
+        "legal_officer",
+        "branch_manager",
+        "user"
+      ],
+      "default": "user"
+    },
+    "branch": {
+      "type": "string",
+      "description": "Associated branch code"
+    },
+    "picture_url": {
+      "type": "string",
+      "description": "Profile picture URL"
+    }
+  },
+  "required": [
+    "full_name",
+    "email"
+  ]
+}

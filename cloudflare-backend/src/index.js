@@ -1,40 +1,102 @@
-const KNOWN_ENTITIES = new Set([
-  'Collateral',
-  'Borrower',
-  'Branch',
-  'Valuation',
-  'LegalCheck',
-  'AuditLog',
-  'ApprovalRequest',
-  'User',
-]);
+import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
+import { swaggerUI } from '@hono/swagger-ui';
+import { cors } from 'hono/cors';
+import { ENTITY_SCHEMAS } from './entitySchemas.generated.js';
+
+const ENTITY_SCHEMA_REGISTRY = ENTITY_SCHEMAS;
+
+const KNOWN_ENTITIES = new Set(Object.keys(ENTITY_SCHEMA_REGISTRY));
 
 const nowIso = () => new Date().toISOString();
 
-const responseHeaders = (contentType = 'application/json') => ({
-  'Content-Type': contentType,
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+const jsonErrorSchema = z.object({
+  error: z.string(),
+  message: z.string().optional(),
 });
 
-const json = (payload, status = 200) =>
-  new Response(JSON.stringify(payload), {
-    status,
-    headers: responseHeaders('application/json'),
-  });
+const userSchema = z.object({
+  id: z.string(),
+  full_name: z.string().optional(),
+  email: z.string().optional(),
+  role: z.string().optional(),
+  created_date: z.string().optional(),
+  updated_date: z.string().optional(),
+}).passthrough();
 
-const empty = (status = 204) =>
-  new Response(null, {
-    status,
-    headers: responseHeaders('text/plain'),
-  });
+const authSuccessSchema = z.object({
+  token: z.string(),
+  user: userSchema,
+});
 
-const safeJsonParse = async (request) => {
-  const body = await request.text();
-  if (!body) return {};
-  return JSON.parse(body);
+const jsonSchemaToZod = (schema, isRequired = true) => {
+  if (!schema || typeof schema !== 'object') {
+    return isRequired ? z.any() : z.any().optional();
+  }
+
+  let result;
+
+  if (Array.isArray(schema.enum) && schema.enum.length > 0) {
+    const literals = schema.enum.map((value) => z.literal(value));
+    result = literals.length === 1 ? literals[0] : z.union(literals);
+  } else {
+    switch (schema.type) {
+      case 'string':
+        result = z.string();
+        break;
+      case 'number':
+        result = z.number();
+        break;
+      case 'integer':
+        result = z.number().int();
+        break;
+      case 'boolean':
+        result = z.boolean();
+        break;
+      case 'array':
+        result = z.array(jsonSchemaToZod(schema.items || {}, true));
+        break;
+      case 'object': {
+        const properties = schema.properties || {};
+        const required = new Set(Array.isArray(schema.required) ? schema.required : []);
+        const shape = {};
+
+        for (const [key, propSchema] of Object.entries(properties)) {
+          shape[key] = jsonSchemaToZod(propSchema, required.has(key));
+        }
+
+        result = z.object(shape).passthrough();
+        break;
+      }
+      default:
+        result = z.any();
+    }
+  }
+
+  if (!isRequired) {
+    result = result.optional();
+  }
+
+  return result;
 };
+
+const entityInputSchemas = Object.fromEntries(
+  Object.entries(ENTITY_SCHEMA_REGISTRY).map(([entityName, schema]) => [entityName, jsonSchemaToZod(schema, true)])
+);
+
+const entityUpdateSchemas = Object.fromEntries(
+  Object.entries(entityInputSchemas).map(([entityName, schema]) => [entityName, schema.partial()])
+);
+
+const entityResponseSchemas = Object.fromEntries(
+  Object.entries(entityUpdateSchemas).map(([entityName, schema]) => [
+    entityName,
+    z.object({
+      id: z.string(),
+      created_date: z.string(),
+      updated_date: z.string(),
+    }).merge(schema).passthrough(),
+  ])
+);
 
 const mapRow = (row) => ({
   id: row.id,
@@ -76,14 +138,12 @@ const hashPassword = async (password, secret = '') => {
   return [...new Uint8Array(digest)].map((part) => part.toString(16).padStart(2, '0')).join('');
 };
 
-const getBearerToken = (request) => {
-  const authHeader = request.headers.get('Authorization') || '';
-  const match = authHeader.match(/^Bearer\s+(.+)$/i);
+const getBearerTokenFromHeader = (authHeader = '') => {
+  const match = String(authHeader).match(/^Bearer\s+(.+)$/i);
   return match ? match[1].trim() : null;
 };
 
-const getSessionUser = async (db, request) => {
-  const token = getBearerToken(request);
+const getSessionUserByToken = async (db, token) => {
   if (!token) return null;
 
   const row = await db
@@ -98,6 +158,11 @@ const getSessionUser = async (db, request) => {
   } catch {
     return null;
   }
+};
+
+const getCurrentUser = async (c) => {
+  const token = getBearerTokenFromHeader(c.req.header('Authorization') || '');
+  return getSessionUserByToken(c.env.DB, token);
 };
 
 const verifyGoogleCredential = async (credential) => {
@@ -126,51 +191,13 @@ const upsertCredentialByEmail = async (db, email, passwordHash) => {
     .run();
 };
 
-const findUserByEmail = async (db, email) => {
-  const users = await listEntities(db, 'User', '-created_date', 500);
-  return users.find((user) => user.email?.toLowerCase() === String(email).toLowerCase()) || null;
-};
+const hasCredentialByEmail = async (db, email) => {
+  const row = await db
+    .prepare('SELECT email FROM auth_credentials WHERE email = ?')
+    .bind(String(email).toLowerCase())
+    .first();
 
-const upsertUserByEmail = async (db, profile) => {
-  const users = await listEntities(db, 'User', '-created_date', 500);
-  const existing = users.find((user) => user.email?.toLowerCase() === profile.email.toLowerCase());
-
-  if (existing) {
-    const patch = {
-      full_name: profile.full_name,
-      picture_url: profile.picture,
-    };
-    const updated = await updateEntityRecord(db, 'User', existing.id, patch);
-    return updated || { ...existing, ...patch };
-  }
-
-  return createEntityRecord(db, 'User', {
-    full_name: profile.full_name,
-    email: profile.email,
-    role: 'user',
-    picture_url: profile.picture,
-  });
-};
-
-const addAuditLog = async (db, { action, entityType, entityId, details }) => {
-  const id = crypto.randomUUID();
-  const stamp = nowIso();
-  const payload = {
-    action,
-    entity_type: entityType,
-    entity_id: entityId,
-    user_email: 'admin@collateral.local',
-    user_name: 'System Admin',
-    details,
-    branch: 'HQ',
-  };
-
-  await db
-    .prepare(
-      'INSERT INTO entity_records (entity, id, data, created_date, updated_date) VALUES (?, ?, ?, ?, ?)'
-    )
-    .bind('AuditLog', id, JSON.stringify(payload), stamp, stamp)
-    .run();
+  return Boolean(row?.email);
 };
 
 const listEntities = async (db, entity, sort = '-created_date', limit = 200) => {
@@ -211,7 +238,35 @@ const listEntities = async (db, entity, sort = '-created_date', limit = 200) => 
     .slice(0, safeLimit);
 };
 
-const createEntityRecord = async (db, entity, payload) => {
+const findUserByEmail = async (db, email) => {
+  const users = await listEntities(db, 'User', '-created_date', 500);
+  return users.find((user) => user.email?.toLowerCase() === String(email).toLowerCase()) || null;
+};
+
+const addAuditLog = async (db, { action, entityType, entityId, details, actor }) => {
+  const id = crypto.randomUUID();
+  const stamp = nowIso();
+  const actorEmail = String(actor?.email || '').trim();
+  const actorName = String(actor?.full_name || actor?.name || '').trim();
+  const payload = {
+    action,
+    entity_type: entityType,
+    entity_id: entityId,
+    user_email: actorEmail || 'system@collateral.local',
+    user_name: actorName || 'System',
+    details,
+    branch: String(actor?.branch || 'HQ'),
+  };
+
+  await db
+    .prepare(
+      'INSERT INTO entity_records (entity, id, data, created_date, updated_date) VALUES (?, ?, ?, ?, ?)'
+    )
+    .bind('AuditLog', id, JSON.stringify(payload), stamp, stamp)
+    .run();
+};
+
+const createEntityRecord = async (db, entity, payload, actor = null) => {
   const stamp = nowIso();
   const id = payload.id || crypto.randomUUID();
 
@@ -225,6 +280,7 @@ const createEntityRecord = async (db, entity, payload) => {
     entityType: entity,
     entityId: id,
     details: `Created ${entity} record`,
+    actor,
   });
 
   return {
@@ -235,7 +291,7 @@ const createEntityRecord = async (db, entity, payload) => {
   };
 };
 
-const updateEntityRecord = async (db, entity, id, patch) => {
+const updateEntityRecord = async (db, entity, id, patch, actor = null) => {
   const existing = await db
     .prepare('SELECT id, data, created_date, updated_date FROM entity_records WHERE entity = ? AND id = ?')
     .bind(entity, id)
@@ -259,6 +315,7 @@ const updateEntityRecord = async (db, entity, id, patch) => {
     entityType: entity,
     entityId: id,
     details: `Updated ${entity} record`,
+    actor,
   });
 
   return {
@@ -267,6 +324,27 @@ const updateEntityRecord = async (db, entity, id, patch) => {
     updated_date: stamp,
     ...merged,
   };
+};
+
+const upsertUserByEmail = async (db, profile) => {
+  const users = await listEntities(db, 'User', '-created_date', 500);
+  const existing = users.find((user) => user.email?.toLowerCase() === profile.email.toLowerCase());
+
+  if (existing) {
+    const patch = {
+      full_name: profile.full_name,
+      picture_url: profile.picture,
+    };
+    const updated = await updateEntityRecord(db, 'User', existing.id, patch);
+    return updated || { ...existing, ...patch };
+  }
+
+  return createEntityRecord(db, 'User', {
+    full_name: profile.full_name,
+    email: profile.email,
+    role: 'user',
+    picture_url: profile.picture,
+  });
 };
 
 const upsertSeed = async (db, entity, id, payload, createdDate) => {
@@ -457,190 +535,492 @@ const base64ToBytes = (base64) => {
   return bytes;
 };
 
-const handleRequest = async (request, env) => {
-  await initDb(env.DB);
-  await seedData(env.DB);
+const app = new OpenAPIHono();
 
-  const url = new URL(request.url);
-  const pathname = url.pathname;
+app.use('*', cors({
+  origin: '*',
+  allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'OPTIONS'],
+  allowHeaders: ['Content-Type', 'Authorization'],
+}));
 
-  if (request.method === 'GET' && pathname === '/health') {
-    return json({ ok: true });
+app.use('*', async (c, next) => {
+  await initDb(c.env.DB);
+  await seedData(c.env.DB);
+  await next();
+});
+
+app.doc('/api/openapi.json', {
+  openapi: '3.0.3',
+  info: {
+    title: 'Collateral Backend API',
+    version: '1.0.0',
+    description: 'Cloudflare Worker API for authentication, entity management, and file uploads.',
+  },
+  servers: [{ url: '/' }],
+  tags: [
+    { name: 'Health' },
+    { name: 'Auth' },
+    { name: 'Entities' },
+    { name: 'Files' },
+  ],
+  components: {
+    securitySchemes: {
+      bearerAuth: {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+      },
+    },
+  },
+});
+
+app.get('/api/docs', swaggerUI({ url: '/api/openapi.json' }));
+app.get('/swagger', swaggerUI({ url: '/api/openapi.json' }));
+
+const healthRoute = createRoute({
+  method: 'get',
+  path: '/health',
+  tags: ['Health'],
+  summary: 'Health check',
+  responses: {
+    200: {
+      description: 'Service health status',
+      content: {
+        'application/json': {
+          schema: z.object({ ok: z.boolean() }),
+        },
+      },
+    },
+  },
+});
+
+app.openapi(healthRoute, (c) => c.json({ ok: true }));
+
+const authGoogleRoute = createRoute({
+  method: 'post',
+  path: '/api/auth/google',
+  tags: ['Auth'],
+  request: {
+    body: {
+      required: true,
+      content: {
+        'application/json': {
+          schema: z.object({ credential: z.string() }),
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      description: 'Authenticated successfully',
+      content: {
+        'application/json': {
+          schema: authSuccessSchema,
+        },
+      },
+    },
+    400: { description: 'Missing credential', content: { 'application/json': { schema: jsonErrorSchema } } },
+    401: { description: 'Invalid credential', content: { 'application/json': { schema: jsonErrorSchema } } },
+  },
+});
+
+app.openapi(authGoogleRoute, async (c) => {
+  const { credential } = c.req.valid('json');
+  const googleUser = await verifyGoogleCredential(credential);
+  if (!googleUser) return c.json({ error: 'Invalid Google credential' }, 401);
+
+  const user = await upsertUserByEmail(c.env.DB, googleUser);
+  const token = `${crypto.randomUUID()}${crypto.randomUUID().replace(/-/g, '')}`;
+  await c.env.DB
+    .prepare('INSERT INTO auth_sessions (token, user_data, created_date) VALUES (?, ?, ?)')
+    .bind(token, JSON.stringify(user), nowIso())
+    .run();
+
+  return c.json({ token, user }, 200);
+});
+
+const authLoginRoute = createRoute({
+  method: 'post',
+  path: '/api/auth/login',
+  tags: ['Auth'],
+  request: {
+    body: {
+      required: true,
+      content: {
+        'application/json': {
+          schema: z.object({ email: z.string().email(), password: z.string() }),
+        },
+      },
+    },
+  },
+  responses: {
+    200: { description: 'Authenticated successfully', content: { 'application/json': { schema: authSuccessSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: jsonErrorSchema } } },
+    404: { description: 'User not found', content: { 'application/json': { schema: jsonErrorSchema } } },
+  },
+});
+
+app.openapi(authLoginRoute, async (c) => {
+  const { email, password } = c.req.valid('json');
+  const normalizedEmail = email.trim().toLowerCase();
+
+  const cred = await c.env.DB
+    .prepare('SELECT password_hash FROM auth_credentials WHERE email = ?')
+    .bind(normalizedEmail)
+    .first();
+
+  if (!cred?.password_hash) return c.json({ error: 'Invalid email or password' }, 401);
+
+  const inputHash = await hashPassword(password, 'ucip-local');
+  if (inputHash !== cred.password_hash) return c.json({ error: 'Invalid email or password' }, 401);
+
+  const user = await findUserByEmail(c.env.DB, normalizedEmail);
+  if (!user) return c.json({ error: 'User not found' }, 404);
+
+  const token = `${crypto.randomUUID()}${crypto.randomUUID().replace(/-/g, '')}`;
+  await c.env.DB
+    .prepare('INSERT INTO auth_sessions (token, user_data, created_date) VALUES (?, ?, ?)')
+    .bind(token, JSON.stringify(user), nowIso())
+    .run();
+
+  return c.json({ token, user }, 200);
+});
+
+const authRegisterRoute = createRoute({
+  method: 'post',
+  path: '/api/auth/register',
+  tags: ['Auth'],
+  request: {
+    body: {
+      required: true,
+      content: {
+        'application/json': {
+          schema: z.object({
+            full_name: z.string().min(1),
+            email: z.string().email(),
+            password: z.string().min(8),
+          }),
+        },
+      },
+    },
+  },
+  responses: {
+    201: { description: 'Registered successfully', content: { 'application/json': { schema: authSuccessSchema } } },
+    409: { description: 'Already exists', content: { 'application/json': { schema: jsonErrorSchema } } },
+  },
+});
+
+app.openapi(authRegisterRoute, async (c) => {
+  const { full_name: fullName, email, password } = c.req.valid('json');
+  const normalizedEmail = email.trim().toLowerCase();
+
+  const existingCredential = await hasCredentialByEmail(c.env.DB, normalizedEmail);
+  const existingUser = await findUserByEmail(c.env.DB, normalizedEmail);
+  if (existingCredential || existingUser) {
+    return c.json({ error: 'An account with this email already exists' }, 409);
   }
 
-  if (request.method === 'POST' && pathname === '/api/auth/google') {
-    const body = await safeJsonParse(request);
-    const credential = String(body.credential || '');
+  const user = await createEntityRecord(c.env.DB, 'User', {
+    full_name: fullName.trim(),
+    email: normalizedEmail,
+    role: 'user',
+  });
 
-    if (!credential) {
-      return json({ error: 'Missing Google credential' }, 400);
-    }
+  const passwordHash = await hashPassword(password, 'ucip-local');
+  await upsertCredentialByEmail(c.env.DB, normalizedEmail, passwordHash);
 
-    const googleUser = await verifyGoogleCredential(credential);
-    if (!googleUser) {
-      return json({ error: 'Invalid Google credential' }, 401);
-    }
+  const token = `${crypto.randomUUID()}${crypto.randomUUID().replace(/-/g, '')}`;
+  await c.env.DB
+    .prepare('INSERT INTO auth_sessions (token, user_data, created_date) VALUES (?, ?, ?)')
+    .bind(token, JSON.stringify(user), nowIso())
+    .run();
 
-    const user = await upsertUserByEmail(env.DB, googleUser);
-    const token = `${crypto.randomUUID()}${crypto.randomUUID().replace(/-/g, '')}`;
-    const createdDate = nowIso();
+  return c.json({ token, user }, 201);
+});
 
-    await env.DB
-      .prepare('INSERT INTO auth_sessions (token, user_data, created_date) VALUES (?, ?, ?)')
-      .bind(token, JSON.stringify(user), createdDate)
+const authMeRoute = createRoute({
+  method: 'get',
+  path: '/api/auth/me',
+  tags: ['Auth'],
+  security: [{ bearerAuth: [] }],
+  responses: {
+    200: { description: 'Current user', content: { 'application/json': { schema: userSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: jsonErrorSchema } } },
+  },
+});
+
+app.openapi(authMeRoute, async (c) => {
+  const currentUser = await getCurrentUser(c);
+  if (!currentUser) return c.json({ error: 'Unauthorized' }, 401);
+  return c.json(currentUser, 200);
+});
+
+const collectionQuerySchema = z.object({
+  sort: z.string().optional(),
+  limit: z.string().optional(),
+});
+
+for (const entityName of Object.keys(ENTITY_SCHEMA_REGISTRY)) {
+  const collectionPath = `/api/entities/${entityName}`;
+  const itemPath = `/api/entities/${entityName}/{id}`;
+  const entityInputSchema = entityInputSchemas[entityName];
+  const entityUpdateSchema = entityUpdateSchemas[entityName];
+  const entityResponseSchema = entityResponseSchemas[entityName];
+
+  const listRoute = createRoute({
+    method: 'get',
+    path: collectionPath,
+    tags: ['Entities'],
+    security: [{ bearerAuth: [] }],
+    request: { query: collectionQuerySchema },
+    responses: {
+      200: { description: `List ${entityName} records`, content: { 'application/json': { schema: z.array(entityResponseSchema) } } },
+      401: { description: 'Unauthorized', content: { 'application/json': { schema: jsonErrorSchema } } },
+    },
+  });
+
+  app.openapi(listRoute, async (c) => {
+    const currentUser = await getCurrentUser(c);
+    if (!currentUser) return c.json({ error: 'Unauthorized' }, 401);
+
+    const { sort, limit } = c.req.valid('query');
+    const rows = await listEntities(c.env.DB, entityName, sort || '-created_date', limit || '200');
+    return c.json(rows, 200);
+  });
+
+  const createRouteForEntity = createRoute({
+    method: 'post',
+    path: collectionPath,
+    tags: ['Entities'],
+    security: [{ bearerAuth: [] }],
+    request: {
+      body: {
+        required: true,
+        content: { 'application/json': { schema: entityInputSchema } },
+      },
+    },
+    responses: {
+      201: { description: `${entityName} created`, content: { 'application/json': { schema: entityResponseSchema } } },
+      401: { description: 'Unauthorized', content: { 'application/json': { schema: jsonErrorSchema } } },
+    },
+  });
+
+  app.openapi(createRouteForEntity, async (c) => {
+    const currentUser = await getCurrentUser(c);
+    if (!currentUser) return c.json({ error: 'Unauthorized' }, 401);
+
+    const payload = c.req.valid('json');
+    const created = await createEntityRecord(c.env.DB, entityName, payload, currentUser);
+    return c.json(created, 201);
+  });
+
+  const updateRouteForEntity = createRoute({
+    method: 'put',
+    path: itemPath,
+    tags: ['Entities'],
+    security: [{ bearerAuth: [] }],
+    request: {
+      params: z.object({ id: z.string() }),
+      body: {
+        required: true,
+        content: { 'application/json': { schema: entityUpdateSchema } },
+      },
+    },
+    responses: {
+      200: { description: `${entityName} updated`, content: { 'application/json': { schema: entityResponseSchema } } },
+      401: { description: 'Unauthorized', content: { 'application/json': { schema: jsonErrorSchema } } },
+      404: { description: 'Not found', content: { 'application/json': { schema: jsonErrorSchema } } },
+    },
+  });
+
+  app.openapi(updateRouteForEntity, async (c) => {
+    const currentUser = await getCurrentUser(c);
+    if (!currentUser) return c.json({ error: 'Unauthorized' }, 401);
+
+    const { id } = c.req.valid('param');
+    const payload = c.req.valid('json');
+    const updated = await updateEntityRecord(c.env.DB, entityName, id, payload, currentUser);
+    if (!updated) return c.json({ error: 'Record not found' }, 404);
+
+    return c.json(updated, 200);
+  });
+
+  const patchRouteForEntity = createRoute({
+    method: 'patch',
+    path: itemPath,
+    tags: ['Entities'],
+    security: [{ bearerAuth: [] }],
+    request: {
+      params: z.object({ id: z.string() }),
+      body: {
+        required: true,
+        content: { 'application/json': { schema: entityUpdateSchema } },
+      },
+    },
+    responses: {
+      200: { description: `${entityName} patched`, content: { 'application/json': { schema: entityResponseSchema } } },
+      401: { description: 'Unauthorized', content: { 'application/json': { schema: jsonErrorSchema } } },
+      404: { description: 'Not found', content: { 'application/json': { schema: jsonErrorSchema } } },
+    },
+  });
+
+  app.openapi(patchRouteForEntity, async (c) => {
+    const currentUser = await getCurrentUser(c);
+    if (!currentUser) return c.json({ error: 'Unauthorized' }, 401);
+
+    const { id } = c.req.valid('param');
+    const payload = c.req.valid('json');
+    const updated = await updateEntityRecord(c.env.DB, entityName, id, payload, currentUser);
+    if (!updated) return c.json({ error: 'Record not found' }, 404);
+
+    return c.json(updated, 200);
+  });
+}
+
+app.get('/api/entities/:entity', async (c) => {
+  const currentUser = await getCurrentUser(c);
+  if (!currentUser) return c.json({ error: 'Unauthorized' }, 401);
+
+  const entity = c.req.param('entity');
+  if (!KNOWN_ENTITIES.has(entity)) {
+    return c.json({ error: `Unknown entity: ${entity}` }, 404);
+  }
+
+  const sort = c.req.query('sort') || '-created_date';
+  const limit = c.req.query('limit') || '200';
+  const rows = await listEntities(c.env.DB, entity, sort, limit);
+  return c.json(rows, 200);
+});
+
+app.post('/api/entities/:entity', async (c) => {
+  const currentUser = await getCurrentUser(c);
+  if (!currentUser) return c.json({ error: 'Unauthorized' }, 401);
+
+  const entity = c.req.param('entity');
+  if (!KNOWN_ENTITIES.has(entity)) {
+    return c.json({ error: `Unknown entity: ${entity}` }, 404);
+  }
+
+  const payload = await c.req.json();
+  const created = await createEntityRecord(c.env.DB, entity, payload, currentUser);
+  return c.json(created, 201);
+});
+
+app.on(['PUT', 'PATCH'], '/api/entities/:entity/:id', async (c) => {
+  const currentUser = await getCurrentUser(c);
+  if (!currentUser) return c.json({ error: 'Unauthorized' }, 401);
+
+  const entity = c.req.param('entity');
+  const id = c.req.param('id');
+  if (!KNOWN_ENTITIES.has(entity)) {
+    return c.json({ error: `Unknown entity: ${entity}` }, 404);
+  }
+
+  const payload = await c.req.json();
+  const updated = await updateEntityRecord(c.env.DB, entity, id, payload, currentUser);
+  if (!updated) return c.json({ error: 'Record not found' }, 404);
+
+  return c.json(updated, 200);
+});
+
+const uploadRoute = createRoute({
+  method: 'post',
+  path: '/api/integrations/core/upload-file',
+  tags: ['Files'],
+  security: [{ bearerAuth: [] }],
+  request: {
+    body: {
+      required: true,
+      content: {
+        'application/json': {
+          schema: z.object({
+            name: z.string().optional(),
+            type: z.string().optional(),
+            contentBase64: z.string(),
+          }),
+        },
+      },
+    },
+  },
+  responses: {
+    200: { description: 'Uploaded', content: { 'application/json': { schema: z.object({ file_url: z.string() }) } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: jsonErrorSchema } } },
+    413: { description: 'Too large', content: { 'application/json': { schema: jsonErrorSchema } } },
+  },
+});
+
+app.openapi(uploadRoute, async (c) => {
+  const currentUser = await getCurrentUser(c);
+  if (!currentUser) return c.json({ error: 'Unauthorized' }, 401);
+
+  const body = c.req.valid('json');
+  const content = String(body.contentBase64 || '').replace(/^data:.*;base64,/, '');
+  if (!content) return c.json({ error: 'Missing file content' }, 400);
+
+  const id = `${Date.now()}-${crypto.randomUUID()}`;
+  const createdDate = nowIso();
+
+  try {
+    await c.env.DB
+      .prepare('INSERT INTO uploaded_files (id, name, mime_type, data_base64, created_date) VALUES (?, ?, ?, ?, ?)')
+      .bind(id, String(body.name || 'upload.bin'), String(body.type || 'application/octet-stream'), content, createdDate)
       .run();
-
-    return json({ token, user });
+  } catch (error) {
+    if (String(error?.message || '').includes('SQLITE_TOOBIG')) {
+      return c.json({ error: 'File is too large. Maximum supported size is 700 KB.' }, 413);
+    }
+    throw error;
   }
 
-  if (request.method === 'POST' && pathname === '/api/auth/login') {
-    const body = await safeJsonParse(request);
-    const email = String(body.email || '').trim().toLowerCase();
-    const password = String(body.password || '');
+  const origin = new URL(c.req.url).origin;
+  return c.json({ file_url: `${origin}/api/uploads/${id}` }, 200);
+});
 
-    if (!email || !password) {
-      return json({ error: 'Email and password are required' }, 400);
-    }
+const downloadUploadRoute = createRoute({
+  method: 'get',
+  path: '/api/uploads/{id}',
+  tags: ['Files'],
+  request: {
+    params: z.object({ id: z.string() }),
+  },
+  responses: {
+    200: {
+      description: 'Binary file content',
+      content: {
+        '*/*': {
+          schema: z.any(),
+        },
+      },
+    },
+    404: { description: 'Not found' },
+  },
+});
 
-    const cred = await env.DB
-      .prepare('SELECT password_hash FROM auth_credentials WHERE email = ?')
-      .bind(email)
-      .first();
+app.openapi(downloadUploadRoute, async (c) => {
+  const { id } = c.req.valid('param');
+  const file = await c.env.DB
+    .prepare('SELECT mime_type, data_base64 FROM uploaded_files WHERE id = ?')
+    .bind(id)
+    .first();
 
-    if (!cred?.password_hash) {
-      return json({ error: 'Invalid email or password' }, 401);
-    }
-
-    const inputHash = await hashPassword(password, 'ucip-local');
-    if (inputHash !== cred.password_hash) {
-      return json({ error: 'Invalid email or password' }, 401);
-    }
-
-    const user = await findUserByEmail(env.DB, email);
-    if (!user) {
-      return json({ error: 'User not found' }, 404);
-    }
-
-    const token = `${crypto.randomUUID()}${crypto.randomUUID().replace(/-/g, '')}`;
-    await env.DB
-      .prepare('INSERT INTO auth_sessions (token, user_data, created_date) VALUES (?, ?, ?)')
-      .bind(token, JSON.stringify(user), nowIso())
-      .run();
-
-    return json({ token, user });
-  }
-
-  if (request.method === 'GET' && pathname === '/api/auth/me') {
-    const user = await getSessionUser(env.DB, request);
-    if (!user) {
-      return json({ error: 'Unauthorized' }, 401);
-    }
-
-    return json(user);
-  }
-
-  const currentUser = await getSessionUser(env.DB, request);
-  if (!currentUser && (pathname.startsWith('/api/entities/') || pathname.startsWith('/api/integrations/core/upload-file'))) {
-    return json({ error: 'Unauthorized' }, 401);
-  }
-
-  if (request.method === 'POST' && pathname === '/api/integrations/core/upload-file') {
-    const body = await safeJsonParse(request);
-    const content = String(body.contentBase64 || '').replace(/^data:.*;base64,/, '');
-
-    if (!content) {
-      return json({ error: 'Missing file content' }, 400);
-    }
-
-    const id = `${Date.now()}-${crypto.randomUUID()}`;
-    const createdDate = nowIso();
-    try {
-      await env.DB.prepare(
-        'INSERT INTO uploaded_files (id, name, mime_type, data_base64, created_date) VALUES (?, ?, ?, ?, ?)'
-      )
-        .bind(id, String(body.name || 'upload.bin'), String(body.type || 'application/octet-stream'), content, createdDate)
-        .run();
-    } catch (error) {
-      if (String(error?.message || '').includes('SQLITE_TOOBIG')) {
-        return json({ error: 'File is too large. Maximum supported size is 700 KB.' }, 413);
-      }
-      throw error;
-    }
-
-    return json({ file_url: `${url.origin}/api/uploads/${id}` });
-  }
-
-  const uploadMatch = pathname.match(/^\/api\/uploads\/([^/]+)$/);
-  if (request.method === 'GET' && uploadMatch) {
-    const id = decodeURIComponent(uploadMatch[1]);
-    const file = await env.DB
-      .prepare('SELECT mime_type, data_base64 FROM uploaded_files WHERE id = ?')
-      .bind(id)
-      .first();
-
-    if (!file) {
-      return new Response('Not found', { status: 404, headers: responseHeaders('text/plain') });
-    }
-
-    return new Response(base64ToBytes(file.data_base64), {
-      status: 200,
-      headers: responseHeaders(file.mime_type || 'application/octet-stream'),
+  if (!file) {
+    return new Response('Not found', {
+      status: 404,
+      headers: { 'Content-Type': 'text/plain', 'Access-Control-Allow-Origin': '*' },
     });
   }
 
-  const collectionMatch = pathname.match(/^\/api\/entities\/([^/]+)$/);
-  if (collectionMatch) {
-    const entity = decodeURIComponent(collectionMatch[1]);
-    if (!KNOWN_ENTITIES.has(entity)) {
-      return json({ error: `Unknown entity: ${entity}` }, 404);
-    }
+  return new Response(base64ToBytes(file.data_base64), {
+    status: 200,
+    headers: {
+      'Content-Type': file.mime_type || 'application/octet-stream',
+      'Access-Control-Allow-Origin': '*',
+    },
+  });
+});
 
-    if (request.method === 'GET') {
-      const sort = url.searchParams.get('sort') || '-created_date';
-      const limit = url.searchParams.get('limit') || '200';
-      const rows = await listEntities(env.DB, entity, sort, limit);
-      return json(rows);
-    }
+app.notFound((c) => c.json({ error: 'Route not found' }, 404));
 
-    if (request.method === 'POST') {
-      const payload = await safeJsonParse(request);
-      const created = await createEntityRecord(env.DB, entity, payload);
-      return json(created, 201);
-    }
-  }
+app.onError((error, c) => c.json({ error: 'Internal server error', message: error.message }, 500));
 
-  const itemMatch = pathname.match(/^\/api\/entities\/([^/]+)\/([^/]+)$/);
-  if (itemMatch) {
-    const entity = decodeURIComponent(itemMatch[1]);
-    const id = decodeURIComponent(itemMatch[2]);
-
-    if (!KNOWN_ENTITIES.has(entity)) {
-      return json({ error: `Unknown entity: ${entity}` }, 404);
-    }
-
-    if (request.method === 'PUT' || request.method === 'PATCH') {
-      const payload = await safeJsonParse(request);
-      const updated = await updateEntityRecord(env.DB, entity, id, payload);
-      if (!updated) {
-        return json({ error: 'Record not found' }, 404);
-      }
-      return json(updated);
-    }
-  }
-
-  return json({ error: 'Route not found' }, 404);
-};
-
-export default {
-  async fetch(request, env) {
-    if (request.method === 'OPTIONS') {
-      return empty();
-    }
-
-    try {
-      return await handleRequest(request, env);
-    } catch (error) {
-      return json({ error: 'Internal server error', message: error.message }, 500);
-    }
-  },
-};
+export default app;

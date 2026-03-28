@@ -29,11 +29,11 @@ export default function Sidebar() {
 
     return (
         <aside className={cn(
-            "fixed left-0 top-0 h-screen bg-sidebar text-sidebar-foreground z-40 transition-all duration-300 flex flex-col",
-            collapsed ? "w-16" : "w-[19rem]"
+            "fixed left-0 top-0 h-screen bg-sidebar text-sidebar-foreground z-40 transition-all duration-300 flex flex-col backdrop-blur-2xl border-r border-sidebar-border shadow-[0_30px_50px_-28px_rgba(8,15,31,0.92)]",
+            collapsed ? "w-16" : "w-[19.5rem]"
         )}>
             <div className="flex items-center gap-3 px-5 h-[4.5rem] border-b border-sidebar-border shrink-0">
-                <div className="h-8 w-8 rounded-lg bg-sidebar-primary flex items-center justify-center shrink-0">
+                <div className="h-8 w-8 rounded-xl bg-sidebar-primary/85 shadow-[inset_0_1px_0_rgba(255,255,255,0.35)] flex items-center justify-center shrink-0">
                     <Shield className="h-4 w-4 text-sidebar-primary-foreground" />
                 </div>
                 {!collapsed && (
@@ -55,8 +55,8 @@ export default function Sidebar() {
                             className={cn(
                                 "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-200",
                                 isActive
-                                    ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                                    : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
+                                    ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]"
+                                    : "text-sidebar-foreground/72 hover:text-sidebar-foreground hover:bg-sidebar-accent/56"
                             )}
                         >
                             <item.icon className={cn("h-4 w-4 shrink-0", isActive && "text-sidebar-primary")} />
