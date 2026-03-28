@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 
 const GOOGLE_SCRIPT_ID = 'google-identity-script';
 
-const getGoogleClientId = () => "import.meta.env.VITE_GOOGLE_CLIENT_ID";
+const getGoogleClientId = () => import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
 export default function Login() {
     const { loginWithGoogle, loginWithPassword, registerWithPassword } = useAuth();
